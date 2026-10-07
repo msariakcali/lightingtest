@@ -4,7 +4,8 @@ import time
 
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
-import winsound
+import shutil
+import subprocess
 from pathlib import Path
 
 import soundfile as sf
@@ -13,6 +14,20 @@ from ema_lightning import EMA
 
 OUT_DIR = Path(__file__).parent / "out"
 OUT_DIR.mkdir(exist_ok=True)
+
+
+def play(path: Path) -> None:
+    """WAV dosyasını çalar; bitene kadar bekler. Çalıcı yoksa sessizce geçer."""
+    if sys.platform == "win32":
+        import winsound
+        winsound.PlaySound(str(path), winsound.SND_FILENAME)
+        return
+    # Linux: PipeWire/PulseAudio -> ALSA -> ffmpeg; macOS: afplay
+    for cmd in (["pw-play"], ["paplay"], ["aplay", "-q"], ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet"], ["afplay"]):
+        if shutil.which(cmd[0]):
+            subprocess.run([*cmd, str(path)])
+            return
+    print("  (ses çalıcı bulunamadı, sadece dosyaya kaydedildi)")
 
 
 def main() -> None:
@@ -39,7 +54,7 @@ def main() -> None:
         sf.write(path, speech.audio, speech.sample_rate)
         print(f"  {speech.duration:.2f} sn ses, {gen * 1000:.0f} ms'de üretildi -> {path.name}")
 
-        winsound.PlaySound(str(path), winsound.SND_FILENAME)
+        play(path)
 
 
 if __name__ == "__main__":
